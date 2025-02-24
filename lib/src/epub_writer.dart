@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:archive/archive.dart';
 import 'dart:convert' as convert;
 import 'package:epubx/src/utils/zip_path_utils.dart';
@@ -14,14 +17,14 @@ class EpubWriter {
   // Creates a Zip Archive of an EpubBook
   static Archive _createArchive(EpubBook book) {
     var arch = Archive();
-
-    // Add simple metadata
-    arch.addFile(ArchiveFile.noCompress(
-        'mimetype', 20, convert.utf8.encode('application/epub+zip')));
-
+    // 将字符串编码为 Uint8List
+    Uint8List mimetypeContent = Uint8List.fromList(utf8.encode('application/epub+zip'));
+    // 创建 ArchiveFile 对象
+    var mimetypeFile = ArchiveFile('mimetype', mimetypeContent.length, mimetypeContent)..compression = CompressionType.none; // 设置为不压缩
+    arch.addFile(mimetypeFile);
+   
     // Add Container file
-    arch.addFile(ArchiveFile('META-INF/container.xml', _container_file.length,
-        convert.utf8.encode(_container_file)));
+    arch.addFile(ArchiveFile('META-INF/container.xml', _container_file.length, convert.utf8.encode(_container_file)));
 
     // Add all content to the archive
     book.Content!.AllFiles!.forEach((name, file) {
@@ -33,19 +36,13 @@ class EpubWriter {
         content = convert.utf8.encode(file.Content!);
       }
 
-      arch.addFile(ArchiveFile(
-          ZipPathUtils.combine(book.Schema!.ContentDirectoryPath, name)!,
-          content!.length,
-          content));
+      arch.addFile(ArchiveFile(ZipPathUtils.combine(book.Schema!.ContentDirectoryPath, name)!, content!.length, content));
     });
 
     // Generate the content.opf file and add it to the Archive
     var contentopf = EpubPackageWriter.writeContent(book.Schema!.Package!);
 
-    arch.addFile(ArchiveFile(
-        ZipPathUtils.combine(book.Schema!.ContentDirectoryPath, 'content.opf')!,
-        contentopf.length,
-        convert.utf8.encode(contentopf)));
+    arch.addFile(ArchiveFile(ZipPathUtils.combine(book.Schema!.ContentDirectoryPath, 'content.opf')!, contentopf.length, convert.utf8.encode(contentopf)));
 
     return arch;
   }
